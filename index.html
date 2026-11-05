@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Body Explorer: ACL & Asthma</title>
+<style>
+:root{--card:#141b33;--text:#eef1fb;--muted:#9aa5c8;--acc:#ff6a1a;color-scheme:dark;box-sizing:border-box}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#05070f;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:var(--text);background:#141b33cc;border:1px solid #2a3560;border-radius:999px;padding:7px 13px;cursor:pointer;font-size:.85rem}
+button.on{background:var(--acc);color:#1a0a00;border-color:var(--acc);font-weight:600}
+#bar{position:fixed;top:0;left:0;height:3px;background:var(--acc);z-index:20;width:0}
+#top{position:fixed;top:0;left:0;right:0;z-index:10;padding:calc(10px + env(safe-area-inset-top,0px)) 10px 14px;background:linear-gradient(#05070fe6,#0000)}
+.tabs,.items{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+#view{position:fixed;inset:0;z-index:0;transition:opacity .6s;background:linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff09 1px,transparent 1px),radial-gradient(ellipse at 65% 45%,#16295a 0%,#05070f 70%);background-size:48px 48px,48px 48px,100% 100%}
+#view canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab}
+#xr{position:absolute;top:60px;right:10px;font-size:.75rem;padding:5px 10px}
+#tip{position:absolute;pointer-events:none;background:#000c;padding:3px 8px;border-radius:6px;font-size:.78rem;display:none;white-space:nowrap}
+#meter{position:absolute;right:12px;top:70px;font-size:.78rem;color:var(--muted);display:none;width:190px}
+#meter .bar{height:8px;border-radius:5px;background:#26305a;overflow:hidden;margin:4px 0}
+#mb{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff6a1a,#7ab8ff)}
+#mt{color:var(--text);font-size:1rem}
+main{position:relative;z-index:1;pointer-events:none}
+.panel{min-height:90vh;display:flex;align-items:center;padding:90px 6vw 150px}
+.card{pointer-events:auto;max-width:440px;background:rgba(15,22,48,.62);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid #ffffff1f;border-radius:20px;padding:22px 24px;box-shadow:0 20px 50px #0008;opacity:0;transform:translateY(30px);transition:opacity .7s,transform .7s}
+.card.in{opacity:1;transform:none}
+.card small{color:var(--acc);letter-spacing:.14em;font-size:.7rem}
+.card h2{margin:6px 0 8px;font-size:1.6rem}
+.card p{margin:0 0 10px;line-height:1.55;color:#d5dbf2;font-size:.95rem}
+.hero .card{max-width:620px;background:none;border:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0}
+.big{font-size:clamp(2.6rem,8vw,5.2rem);margin:6px 0 12px;line-height:1;background:linear-gradient(90deg,#fff,#ff6a1a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.wide{max-width:900px;width:100%}
+.tbl{display:grid;grid-template-columns:1fr 1.4fr 1.4fr;gap:8px 12px;font-size:.88rem;margin-top:10px}
+.tbl span:nth-child(3n+1){color:var(--muted)}
+#dock{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:8px 12px calc(12px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#dock>*{pointer-events:auto}
+#info{display:none;background:rgba(15,22,48,.85);border:1px solid #2a3560;border-radius:14px;padding:12px 14px;max-height:30vh;overflow:auto;max-width:640px;margin:0 auto}
+#info.show{display:block}
+#info h2{margin:0 0 4px;font-size:1rem;color:var(--acc)}
+#info p{margin:0;font-size:.9rem;line-height:1.45}
+#pl{display:none}
+@media(max-width:800px){.panel{align-items:flex-start}.hero{align-items:center}.card{max-width:100%}.tbl{grid-template-columns:1fr 1fr 1fr;font-size:.78rem}}
+
+#rp{position:fixed;z-index:8;right:16px;top:90px;width:min(340px,calc(100% - 32px));background:rgba(8,12,28,.84);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid #ff6a1a66;border-radius:18px;padding:18px;display:none}
+#rp.show{display:block}
+#rp h2{margin:4px 0 6px;font-size:1.4rem}
+#rp p{font-size:.9rem;line-height:1.5;color:#d5dbf2;margin:0 0 10px}
+#rp small{color:var(--acc);letter-spacing:.14em;font-size:.68rem;display:block;margin-bottom:6px}
+#rp .x{position:absolute;top:10px;right:10px;padding:2px 9px}
+#back{position:fixed;z-index:9;left:10px;top:56px;display:none;background:var(--acc);color:#1a0a00;border-color:var(--acc);font-weight:700}
+#hx{position:absolute;top:96px;left:10px;display:none}
+.k span{color:#d5dbf2!important}
+@media(max-width:800px){#rp{top:auto;bottom:12px}}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<header id="top"><div class="tabs" id="tabs"></div></header>
+<div id="view"><button id="xr">X-ray: on</button><button id="hx">View: Healthy ⇄</button><div id="tip"></div><div id="meter"><span>Airflow (rough estimate)</span><div class="bar"><i id="mb"></i></div><b id="mt">100%</b></div></div>
+<main>
+<section class="panel hero" id="hero" data-tab="body"><div class="card in"><small>INTERACTIVE 3D EXPLORER</small><h1 class="big">Inside the Body</h1><p>An interactive 3D look at the human body, ACL tears, and asthma. Drag to rotate, hover a body part, then click it and choose a topic to zoom in. Try the glowing knee or chest.</p><p style="color:var(--muted);font-size:.78rem">Illustrative model made from simple 3D shapes, not a medical-grade scan.</p><button class="on" onclick="document.getElementById('s-parts').scrollIntoView()">Or scroll to start ↓</button></div></section>
+<section class="panel" id="s-parts" data-tab="parts"><div class="card"><small>PART 1 · THE KNEE</small><h2>The knee’s quiet hero</h2><p>Bones, two crossing ligaments, and a pair of cushions work together every time you walk, jump, or turn. Pick a part below, or click it on the model, to meet it.</p></div></section>
+<section class="panel" id="s-tear" data-tab="tear" data-stage="0"><div class="card"><small>PART 2 · THE INJURY</small><h2>One pivot. One pop.</h2><p>Scroll to watch an ACL tear happen, one step at a time. Drag the model to see it from any side.</p></div></section>
+<div id="tearP"></div>
+<section class="panel" id="s-ast" data-tab="asthma" data-stage="0"><div class="card"><small>PART 3 · THE AIRWAY</small><h2>Every breath, narrowed.</h2><p>See what a tiny breathing tube goes through during asthma. Click the muscle, lining, or mucus to learn more.</p></div></section>
+<div id="astP"></div>
+<section class="panel" data-tab="none"><div class="card wide"><small>KEY CONCEPTS</small><h2>The science in three ideas</h2><div class="tbl k" style="grid-template-columns:1fr 1fr 1fr"><b>Ligament</b><b>Inflammation</b><b>Bronchoconstriction</b><span>Tough tissue that connects bone to bone and steadies a joint.</span><span>The body’s response to injury or irritation: swelling, redness, and extra fluid.</span><span>Tightening of the muscle around an airway, which narrows the tube.</span></div></div></section>
+<section class="panel" data-tab="none"><div class="card wide"><small>COMPARE</small><h2>Two conditions, side by side</h2>
+<div class="tbl"><b></b><b>ACL tear</b><b>Asthma</b>
+<span>Body part</span><span>Ligament in the knee</span><span>Airways in the lungs</span>
+<span>What happens</span><span>The ligament is stretched, then torn</span><span>Airways swell, squeeze, and fill with mucus</span>
+<span>Common trigger</span><span>Sudden pivot or awkward landing</span><span>Dust, pollen, smoke, cold air, exercise</span>
+<span>Signs</span><span>Pop, swelling, knee gives way</span><span>Wheezing, cough, tight chest</span>
+<span>Treatment</span><span>Rehab or surgery</span><span>Reliever and controller inhalers</span></div></div></section>
+<section class="panel" data-tab="none"><div class="card wide"><small>QUIZ</small><h2>Test yourself</h2><div id="qz"></div></div></section>
+<section class="panel" style="min-height:35vh" data-tab="none"><div class="card wide"><p>Made with Three.js. For learning only, not medical advice.</p></div></section>
+</main>
+<div id="rp"></div><button id="back">← Full body</button>
+<div id="dock"><div class="items" id="items"></div><div id="info"><h2></h2><p></p></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const D={
+reg:{
+head:['Head and brain','The skull protects the brain, the control center of the nervous system. It sends and receives signals through the spinal cord and nerves.',[],3.3],
+chest:['Thorax (chest)','The rib cage protects the lungs and heart. Breathing uses the diaphragm and rib muscles to move air. Asthma affects the small airways inside the lungs.',[['Asthma','s-ast']],1.5],
+abdomen:['Abdomen','Holds digestive organs like the stomach, liver, and intestines.',[],-.2],
+arm:['Upper limb','Shoulder, arm, forearm, and hand. Muscles pull on bones to move each joint.',[],1.2],
+thigh:['Thigh','The femur is the longest bone in the body. The large quadriceps and hamstring muscles surround it.',[],-1.5],
+knee:['Knee joint','A hinge joint where the femur meets the tibia. Ligaments such as the ACL keep it stable.',[['Knee anatomy','s-parts'],['ACL tear','s-tear']],-2.2],
+leg:['Lower leg','The tibia and fibula carry your body weight and connect to the foot at the ankle.',[],-3]
+},
+parts:{
+femur:['Femur (thigh bone)','The femur is the longest, strongest bone in the body. Its rounded lower end forms the top of the knee. The ACL attaches to the inner side of its outer knob (the lateral condyle).'],
+tibia:['Tibia (shin bone)','The tibia is the main shin bone. Its flat top, the tibial plateau, carries your body weight. The ACL attaches to the front of the top of the tibia.'],
+cartilage:['Articular cartilage','A smooth, slippery blue-white coating on the ends of the bones. It lets the femur glide over the tibia with very little friction.'],
+acl:['ACL (Anterior Cruciate Ligament)','A tough band made of many twisted fibers, running diagonally inside the knee from the back of the femur to the front of the tibia. It stops the tibia from sliding too far forward and keeps the knee steady when you twist, pivot, or land.'],
+pcl:['PCL (Posterior Cruciate Ligament)','The ACL’s partner. It crosses the ACL to form an “X” (cruciate means cross). It stops the tibia from sliding backward.'],
+meniscus:['Meniscus','C-shaped rubbery cartilage between the femur and tibia. It works like a shock absorber, spreads out weight, and helps the knee stay stable. It can also get hurt during an ACL injury.']
+},
+tear:[
+['Step 1: Stress on the ACL','It usually starts with a sudden stop, a quick pivot, an awkward landing from a jump, or a hit to the knee. The tibia is forced forward and the knee twists, so the ACL is stretched past its limit. It turns orange to show strain.'],
+['Step 2: Partial tear','Some fibers snap, often with a loud “pop” felt in the knee. The ligament frays and only a few strands hold on. This is a partial tear.'],
+['Step 3: Complete tear','The last fibers give way and the ACL is torn into two ends. The tibia can now slide forward under the femur (anterior tibial translation, checked by the “drawer test”).'],
+['Step 4: Swelling and instability','Within hours the knee swells because of bleeding inside the joint. It hurts, is hard to bend, and feels like it will “give way.” The meniscus may be hurt too. Treatment can be rehab, or surgery to rebuild the ligament with a graft.'],
+['Step 5: Healing and rebuilding','Torn ACLs rarely heal on their own because the ends pull apart. Surgeons often rebuild it with a graft, a tendon taken from another part of the body. The graft (green) is fixed to the bone, and over months the body slowly turns it into new ligament tissue.'],
+['Step 6: Rehabilitation','Physical therapy rebuilds the knee step by step: reduce swelling, regain movement, strengthen the muscles, then train for sports. Many athletes need about 9 to 12 months before returning to sport.']
+],
+asthma:[
+['Step 1: Normal airway','A healthy bronchiole (small breathing tube) has a smooth lining and relaxed muscle around it, so air flows in and out easily.'],
+['Step 2: Trigger enters','A trigger like dust, pollen, smoke, cold air, or exercise gets breathed in. In a person with asthma, the airway reacts strongly to these triggers.'],
+['Step 3: Inflammation','The lining gets irritated, red, and swollen. The swelling makes the opening of the tube smaller, so less air can pass.'],
+['Step 4: Bronchoconstriction','The muscles around the airway tighten and squeeze the tube even narrower. This causes wheezing, chest tightness, and shortness of breath. A reliever inhaler relaxes these muscles.'],
+['Step 5: Excess mucus','The airway makes thick, sticky mucus that clogs the narrow space. Coughing increases and breathing gets hard. This is an asthma attack. Controller medicine lowers the swelling over time.'],
+['Step 6: Recovery','With a reliever inhaler the muscles relax, the swelling slowly goes down, and mucus is coughed out. The airway widens again and breathing returns toward normal. Controller medicine helps prevent the next attack.']
+],
+ap:{
+muscle:['Smooth muscle','The ring of muscle around the airway. In asthma it tightens (bronchoconstriction) and squeezes the airway closed.'],
+lining:['Airway lining','The inner wall of the tube. When irritated it becomes inflamed and swollen, which narrows the path for air.'],
+mucus:['Mucus','Sticky fluid that normally traps germs and dust. In an asthma attack, too much thick mucus blocks the airway.'],
+trigger:['Trigger particles','Things like pollen, dust, or smoke that start the asthma reaction in sensitive airways.']
+}};
+const TABS={body:{n:'Body',items:[]},parts:{n:'ACL Parts',items:[['femur','Femur'],['tibia','Tibia'],['cartilage','Cartilage'],['acl','ACL'],['pcl','PCL'],['meniscus','Meniscus']]},
+tear:{n:'ACL Tear Process',items:D.tear.map((t,i)=>[i,t[0].split(':')[0]])},
+asthma:{n:'Asthma Process',items:D.asthma.map((t,i)=>[i,t[0].split(':')[0]])}};
+let tab='parts',stage=-1,sel=null,playT=null,lastTouch=0,popT=-99,entryT=0,xray=true;
+const view=document.getElementById('view'),clock=new THREE.Clock();
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,100);cam.position.set(0,.3,11);
+const rend=new THREE.WebGLRenderer({antialias:true,alpha:true});
+rend.setPixelRatio(Math.min(devicePixelRatio,2));rend.toneMapping=THREE.ACESFilmicToneMapping;rend.toneMappingExposure=1.15;rend.outputEncoding=THREE.sRGBEncoding;
+view.appendChild(rend.domElement);
+scene.add(new THREE.HemisphereLight(0xcfe3ff,0x402030,.7));
+const key=new THREE.DirectionalLight(0xfff2e0,1.2);key.position.set(4,6,8);scene.add(key);
+const rim=new THREE.DirectionalLight(0x6aa0ff,.9);rim.position.set(-6,2,-6);scene.add(rim);
+const fill=new THREE.PointLight(0xffb89a,.6,30);fill.position.set(0,-3,6);scene.add(fill);
+/* helpers */
+function noiseTex(rx){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle='#808080';x.fillRect(0,0,256,256);
+for(let i=0;i<4000;i++){const v=Math.random()*255|0;x.fillStyle='rgba('+v+','+v+','+v+',.25)';x.beginPath();x.arc(Math.random()*256,Math.random()*256,Math.random()*3+.5,0,7);x.fill()}
+const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,rx);return t}
+function organic(g,a,f){const p=g.attributes.position,v=new THREE.Vector3(),n=new THREE.Vector3();
+for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i);const k=Math.sin(v.x*f+1.3)*Math.sin(v.y*f*.8+.7)*Math.sin(v.z*f+2.1);n.copy(v).normalize();v.addScaledVector(n,k*a);p.setXYZ(i,v.x,v.y,v.z)}
+g.computeVertexNormals();return g}
+const mk=(g,m,k,p)=>{const x=new THREE.Mesh(g,m);x.userData.key=k;if(p)x.position.set(...p);return x};
+const bumpT=noiseTex(3);
+const boneMats=[];
+const boneM=()=>{const m=new THREE.MeshPhysicalMaterial({color:0xeadfc4,roughness:.7,bumpMap:bumpT,bumpScale:1.5,clearcoat:.1,transparent:true,opacity:.55,depthWrite:false});boneMats.push(m);return m};
+const cartM=new THREE.MeshPhysicalMaterial({color:0xcfe8f0,roughness:.2,clearcoat:1,clearcoatRoughness:.1,transparent:true,opacity:.9});
+const aclMat=new THREE.MeshPhysicalMaterial({color:0xe8c77a,roughness:.4,clearcoat:.7,clearcoatRoughness:.3});
+const pclMat=new THREE.MeshPhysicalMaterial({color:0xb98f58,roughness:.45,clearcoat:.6});
+const menM=new THREE.MeshPhysicalMaterial({color:0xf2ecd8,roughness:.35,clearcoat:.5});
+function lig(A,B,o){const g=new THREE.Group(),a0=new THREE.Vector3(...A),d=new THREE.Vector3(...B).sub(a0),u=d.clone().normalize();
+let s=new THREE.Vector3(0,0,1).cross(u);if(s.lengthSq()<.01)s.set(1,0,0);s.normalize();const w=u.clone().cross(s);
+for(let i=0;i<o.n;i++){const ph=i/o.n*6.283,h=Math.sin(i*12.9898)*.5+.5;
+const full=o.cut&&i>=(o.keep||0)?[[0,o.cut[0]+.14*h],[o.cut[1]+.18*h,1]]:[[0,1]];
+full.forEach(([a,b],ri)=>{const pts=[];for(let k=0;k<=10;k++){const t=a+(b-a)*k/10,rr=o.r*(1+.25*Math.sin(Math.PI*t)),ang=ph+t*o.tw;
+let fr=0;if(o.cut&&(i>=(o.keep||0))){fr=ri===0?Math.max(0,t-.15)/.3:Math.max(0,.85-t)/.3}
+const sw=(o.sw||0)*fr*Math.sin(o.t*2.2+i);
+const p=a0.clone().addScaledVector(d,t).addScaledVector(s,Math.cos(ang)*rr+sw+Math.cos(ph*3)*.05*fr).addScaledVector(w,Math.sin(ang)*rr);p.y-=.14*fr*fr;pts.push(p)}
+g.add(mk(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),12,o.sr,6,false),o.mat,o.key))})}
+return g}
+/* KNEE */
+const knee=new THREE.Group(),femG=new THREE.Group(),tibG=new THREE.Group(),aclG=new THREE.Group();
+const lathe=(pts,m,k,y)=>{const x=mk(organic(new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),36),.05,3),m,k,[0,y,0]);return x};
+femG.add(lathe([[0,0],[1.25,0],[1.05,.4],[.8,1],[.65,1.8],[.6,2.6],[.68,3.3],[0,3.4]],boneM(),'femur',1));
+[-.65,.65].forEach(x=>{const c=mk(organic(new THREE.SphereGeometry(.62,32,24),.04,4),boneM(),'femur',[x,.85,0]);c.scale.set(1,.95,1.15);femG.add(c);
+const k=mk(new THREE.SphereGeometry(.655,32,16,0,Math.PI*2,Math.PI*.5,Math.PI*.5),cartM,'cartilage',[x,.85,0]);k.scale.set(1,.95,1.15);femG.add(k)});
+tibG.add(mk(organic(new THREE.CylinderGeometry(1.35,1.25,.3,40,2),.03,4),boneM(),'tibia',[0,-.7,0]));
+tibG.add(mk(new THREE.CylinderGeometry(1.28,1.28,.05,40),cartM,'cartilage',[0,-.54,0]));
+tibG.add(lathe([[0,0],[.62,.1],[.6,1],[.7,2],[.9,2.7],[1.15,3.2]],boneM(),'tibia',-3.9));
+[-.7,.7].forEach((x,i)=>{const t=mk(new THREE.TorusGeometry(.5,.16,14,36,Math.PI*1.6),menM,'meniscus',[x,-.48,0]);t.rotation.set(Math.PI/2,0,i?Math.PI:0);t.scale.set(1.1,1,.6);tibG.add(t)});
+knee.add(femG,tibG,aclG);
+knee.add(lig([-.1,.8,.3],[.1,-.5,-.4],{r:.065,n:6,sr:.03,tw:3,mat:pclMat,key:'pcl',t:0}));
+const swell=mk(new THREE.SphereGeometry(2.2,28,20),new THREE.MeshStandardMaterial({color:0xff4a4a,transparent:true,opacity:.2,depthWrite:false}),'swell');swell.visible=false;swell.raycast=()=>{};knee.add(swell);
+const ring=new THREE.Mesh(new THREE.RingGeometry(.25,.34,40),new THREE.MeshBasicMaterial({color:0xffe066,transparent:true,side:THREE.DoubleSide}));ring.visible=false;ring.raycast=()=>{};knee.add(ring);
+const F=[.12,.78,-.35],T=[-.02,-.52,.3];let shift=0;
+function updateAcl(t,sh){tibG.position.z=sh;const T2=[T[0],T[1],T[2]+sh],s=stage;
+aclMat.color.setHex(s<0||s===5?0xe8c77a:s===0?0xf09a3c:s===4?0xa9d18e:0xd2433a);
+const o={r:.09,n:7,sr:.034,tw:3.2,mat:aclMat,key:'acl',t};
+if(s===0){o.r=.07;o.tw=1.2}
+if(s===1){o.cut=[.38,.55];o.keep=2;o.sw=.04}
+if(s===2||s===3){o.cut=[.36,.55];o.sw=.09}
+aclG.children.forEach(c=>c.children.forEach(m=>m.geometry.dispose()));aclG.clear();aclG.add(lig(F,T2,o));return T2}
+/* ASTHMA */
+const ast=new THREE.Group(),tube=new THREE.Group();ast.add(tube);
+function ridges(g){const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),th=Math.atan2(x,z),f=1+.05*Math.sin(th*10)+.03*Math.sin(y*2.4+th*3);p.setXYZ(i,x*f,y,z*f)}g.computeVertexNormals();return g}
+const lining=mk(ridges(new THREE.CylinderGeometry(1,1,5,72,30,true,0,Math.PI*1.65)),new THREE.MeshPhysicalMaterial({color:0xe58a96,roughness:.35,clearcoat:1,clearcoatRoughness:.2,bumpMap:noiseTex(4),bumpScale:2,side:THREE.DoubleSide}),'lining');
+const mc=document.createElement('canvas');mc.width=64;mc.height=256;const mx=mc.getContext('2d');mx.fillStyle='#8f2230';mx.fillRect(0,0,64,256);
+for(let i=0;i<256;i+=4){mx.fillStyle=i%8?'#b53444':'#74161f';mx.fillRect(0,i,64,2)}
+const mtex=new THREE.CanvasTexture(mc);mtex.wrapS=mtex.wrapT=THREE.RepeatWrapping;mtex.repeat.set(1,3);
+const muscle=mk(new THREE.CylinderGeometry(1,1,5,72,1,true,0,Math.PI*1.65),new THREE.MeshPhysicalMaterial({map:mtex,roughness:.55,clearcoat:.3,side:THREE.DoubleSide}),'muscle');
+[lining,muscle].forEach(m=>{m.rotation.x=Math.PI/2;tube.add(m)});
+tube.rotation.z=3.66;ast.rotation.set(.55,Math.PI/2,0);
+const blobs=[],pol=[],air=[];
+const mucM=new THREE.MeshPhysicalMaterial({color:0xe6dc7a,roughness:.15,clearcoat:1,transparent:true,opacity:.92});
+for(let i=0;i<18;i++){const b=mk(new THREE.SphereGeometry(.26,16,12),mucM,'mucus');b.userData={a:-1.2+i*.245,z:-2.2+(i*.61)%4.4,ph:i};tube.add(b);blobs.push(b)}
+for(let i=0;i<24;i++){const p=mk(new THREE.IcosahedronGeometry(.085,1),new THREE.MeshStandardMaterial({color:0xffd23f,roughness:.8}),'trigger');p.userData={a:Math.random()*6.28,z:Math.random()*5-2.5,r:Math.random()*.6+.15};tube.add(p);pol.push(p)}
+for(let i=0;i<40;i++){const p=new THREE.Mesh(new THREE.SphereGeometry(.045,8,6),new THREE.MeshBasicMaterial({color:0x9fe3ff,transparent:true,opacity:.7}));p.raycast=()=>{};p.userData={a:Math.random()*6.28,z:Math.random()*5-2.5,r:Math.random()*.7};tube.add(p);air.push(p)}
+const AS=[{lr:1.3,c:0xe58a96,mu:0,tr:0,th:.28,af:100},{lr:1.3,c:0xe58a96,mu:0,tr:1,th:.28,af:100},{lr:1.0,c:0xd9343f,mu:0,tr:0,th:.3,af:35},{lr:.7,c:0xd9343f,mu:0,tr:0,th:.42,af:8},{lr:.7,c:0xd9343f,mu:1,tr:0,th:.42,af:3},{lr:1.15,c:0xea9aa4,mu:.3,tr:0,th:.3,af:70}];
+const cur={lr:1.3,mu:0,tr:0,th:.28},tgt={lr:1.3,mu:0,tr:0,th:.28,c:0xe58a96};let afCur=100,afT=100;const lc=new THREE.Color(0xe58a96),tc=new THREE.Color();
+
+/* BODY (illustrative) */
+const bodyG=new THREE.Group(),bm={};
+Object.keys(D.reg).forEach(k=>bm[k]=new THREE.MeshPhysicalMaterial({color:0x8aa0c8,roughness:.35,clearcoat:.8,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide}));
+const om=c=>new THREE.MeshPhysicalMaterial({color:c,roughness:.45,clearcoat:.5}),ivo=om(0xeadfc4);
+function limb(a,b,r1,r2,m,k){const A=new THREE.Vector3(...a),d=new THREE.Vector3(...b).sub(A),x=mk(new THREE.CylinderGeometry(r2,r1,d.length(),16),m,k);x.position.copy(A.clone().addScaledVector(d,.5));x.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());bodyG.add(x)}
+function ball(r,p,m,k,sc){const x=mk(new THREE.SphereGeometry(r,20,16),m,k,p);if(sc)x.scale.set(...sc);bodyG.add(x);return x}
+[[[[0,0],[.55,.02],[.72,.35],[.6,.8],[.55,1.1],[.62,1.45],[0,1.5]],'abdomen',-.9],[[[0,0],[.62,.02],[.8,.7],[.82,1.2],[.6,1.65],[.25,2],[0,2.05]],'chest',.55]].forEach(([p,k,y])=>{const t=lathe(p,bm[k],k,y);t.scale.z=.55;bodyG.add(t)});
+ball(.45,[0,3.55,0],bm.head,'head',[.88,1.1,1]);limb([0,2.95,0],[0,3.2,0],.2,.18,bm.head,'head');
+ball(.36,[0,3.58,0],om(0xd9a0a8),'head',[.85,.85,.95]);
+[-1,1].forEach(q=>{ball(.3,[q*.92,2.35,0],bm.arm,'arm');limb([q*.95,2.3,0],[q*1.22,.9,0],.22,.17,bm.arm,'arm');limb([q*1.22,.9,0],[q*1.38,-.5,.05],.17,.11,bm.arm,'arm');ball(.14,[q*1.42,-.68,.05],bm.arm,'arm',[1,1.3,.6]);
+const x=q*.38;limb([x,-.7,0],[x,-2.2,0],.33,.22,bm.thigh,'thigh');ball(.25,[x,-2.2,0],bm.knee,'knee');limb([x,-2.2,0],[x,-3.8,0],.2,.12,bm.leg,'leg');ball(.2,[x,-3.9,.18],bm.leg,'leg',[.8,.45,1.6]);
+limb([x,-.6,0],[x,-2.15,0],.09,.07,ivo,'thigh');limb([x,-2.25,0],[x,-3.7,0],.07,.05,ivo,'leg');
+const l=mk(organic(new THREE.SphereGeometry(1,24,18),.06,3),om(0xe08a96),'chest',[q*.32,1.6,.02]);l.scale.set(.27,.62,.27);bodyG.add(l);limb([0,1.95,0],[q*.18,1.6,0],.04,.04,om(0xd8e6f0),'chest')});
+limb([0,2.55,0],[0,1.95,0],.06,.06,om(0xd8e6f0),'chest');ball(.17,[.16,1.4,.1],om(0xc0303a),'chest');
+for(let i=0;i<23;i++)ball(.07,[0,-.5+i*.16,-.17-.06*Math.sin(i/22*3.1)],ivo,i*.16-.5>.55?'chest':'abdomen');
+for(let i=0;i<6;i++){const r=mk(new THREE.TorusGeometry(.6+.1*Math.sin(i/5*Math.PI),.028,8,32),ivo,'chest',[0,.95+i*.22,0]);r.rotation.x=Math.PI/2;r.scale.y=.6;bodyG.add(r)}
+ball(.2,[.2,.3,.1],om(0xc77d62),'abdomen',[1,1.3,.8]);ball(.3,[-.25,.45,.08],om(0x8a3a30),'abdomen',[1.3,.7,.8]);ball(.32,[0,-.35,.05],om(0xd9a58f),'abdomen',[1.3,.8,.7]);
+const fl=new THREE.Mesh(new THREE.RingGeometry(1.5,1.56,64),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.6,side:THREE.DoubleSide}));fl.rotation.x=-Math.PI/2;fl.position.y=-4.05;fl.raycast=()=>{};bodyG.add(fl);
+const hots=[[.38,-2.2,.3],[0,1.6,.62]].map(p=>{const h=new THREE.Mesh(new THREE.RingGeometry(.12,.17,32),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,side:THREE.DoubleSide}));h.position.set(...p);h.raycast=()=>{};bodyG.add(h);return h});
+scene.add(bodyG);
+scene.add(knee,ast);knee.rotation.y=.6;
+const active=()=>tab==='asthma'?ast:tab==='body'?bodyG:knee;
+/* UI */
+const info=document.getElementById('info'),tip=document.getElementById('tip'),meter=document.getElementById('meter'),xr=document.getElementById('xr');
+function showInfo(a){info.querySelector('h2').textContent=a[0];info.querySelector('p').textContent=a[1];info.classList.add('show')}
+function paint(){active().traverse(o=>{if(o.isMesh&&o.material.emissive&&o!==swell)o.material.emissive.setHex(sel&&o.userData.key===sel?0x4a4a18:0)})}
+function select(k){if(tab==='body'){openRegion(k);return}sel=k;paint();showInfo(tab==='asthma'?D.ap[k]:D.parts[k])}
+function setStage(i){stage=i;sel=null;lining.material.emissiveIntensity=1;paint();entryT=clock.elapsedTime;
+if(tab==='tear'){if(i===1||i===2)popT=entryT;info.classList.remove('show')}
+if(tab==='asthma'){const s=AS[i];Object.assign(tgt,{lr:s.lr,mu:s.mu,tr:s.tr,th:s.th,c:s.c});afT=s.af;info.classList.remove('show')}}
+function stopPlay(){clearInterval(playT);playT=null;const b=document.getElementById('pl');if(b){b.textContent='▶ Auto play';b.classList.remove('on')}}
+function pickItem(i){document.querySelectorAll('#items button[data-k]').forEach(x=>x.classList.toggle('on',x.dataset.k==i))}
+function setTab(t){stopPlay();tab=t;knee.visible=t==='parts'||t==='tear';ast.visible=t==='asthma';bodyG.visible=t==='body';sel=null;
+meter.style.display=t==='asthma'?'block':'none';xr.style.display=(t==='parts'||t==='tear')?'block':'none';document.getElementById('items').style.display=t==='parts'?'flex':'none';
+document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+const it=document.getElementById('items');it.innerHTML='';
+TABS[t].items.forEach(([k,l])=>{const b=document.createElement('button');b.textContent=l;b.dataset.k=k;b.onclick=()=>{stopPlay();pickItem(k);t==='parts'?select(k):setStage(+k)};it.appendChild(b)});
+if(t!=='parts'){const p=document.createElement('button');p.id='pl';p.textContent='▶ Auto play';p.onclick=()=>{if(playT){stopPlay();return}
+p.textContent='⏸ Pause';p.classList.add('on');const n=TABS[t].items.length;playT=setInterval(()=>{const nx=(stage+1)%n;pickItem(nx);setStage(nx)},5000)};it.appendChild(p)}
+if(t==='parts'){stage=-1;showInfo(['Parts of the knee','Tap a part below, or click it in the 3D model, to learn what it does. Try the ACL (tan)!'])}
+else{setStage(0);pickItem(0)}}
+const tb=document.getElementById('tabs');
+Object.entries(TABS).forEach(([k,v])=>{const b=document.createElement('button');b.textContent=v.n;b.dataset.t=k;b.onclick=()=>setTab(k);tb.appendChild(b)});
+xr.onclick=()=>{xray=!xray;xr.textContent='X-ray: '+(xray?'on':'off');boneMats.forEach(m=>{m.transparent=xray;m.opacity=xray?.55:1;m.depthWrite=!xray;m.needsUpdate=true})};
+/* input */
+let down=null,moved=0;const rc=new THREE.Raycaster(),mv=new THREE.Vector2(),cv=rend.domElement;
+function pick(e){const r=cv.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);rc.setFromCamera(mv,cam);
+const h=rc.intersectObject(active(),true).filter(x=>x.object.userData.key&&x.object.visible);if(!h.length)return null;
+return(h.find(x=>!['femur','tibia','cartilage'].includes(x.object.userData.key))||h[0]).object.userData.key}
+cv.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};moved=0;lastTouch=clock.elapsedTime;cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing'});
+cv.addEventListener('pointermove',e=>{if(!down){const k=pick(e),n=k&&(D.parts[k]||D.ap[k]||D.reg[k]);cv.style.cursor=k?'pointer':'grab';
+if(n&&k!=='swell'){tip.style.display='block';tip.textContent=n[0].split(' (')[0];tip.style.left=e.offsetX+14+'px';tip.style.top=e.offsetY+14+'px'}else tip.style.display='none';return}
+const dx=e.clientX-down.x,dy=e.clientY-down.y;moved+=Math.abs(dx)+Math.abs(dy);down={x:e.clientX,y:e.clientY};lastTouch=clock.elapsedTime;
+const g=active();g.rotation.y+=dx*.01;g.rotation.x=Math.max(-1.4,Math.min(1.4,g.rotation.x+dy*.01))});
+cv.addEventListener('pointerup',e=>{cv.style.cursor='grab';if(down&&moved<5){const k=pick(e);if(k){if(tab==='tear'&&k==='acl'){sel='acl';paint();showInfo(D.tear[stage])}else select(k)}}down=null});
+function resize(){const w=innerWidth,h=innerHeight;rend.setSize(w,h);cam.aspect=w/h;camBase=w/h<.8?15:11;camX=w/h>1.1?-2.6:0;camY0=w/h<.8?-1.6:.3;cam.updateProjectionMatrix()}
+new ResizeObserver(resize).observe(view);
+/* loop */
+const ease=x=>x*x*(3-2*x);
+function loop(){const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,idle=t-lastTouch>2.5,g=active();camStep(t);
+if(idle)g.rotation.y+=Math.sin(t*.5)*.0025;
+if(tab==='asthma'){const k=.07;['lr','mu','tr','th'].forEach(n=>cur[n]+=(tgt[n]-cur[n])*k);lc.lerp(tc.setHex(tgt.c),k);afCur+=(afT-afCur)*.05;
+const st=Math.max(stage,0),lr=cur.lr*(1+[.05,.05,.03,.015,.01,.04][st]*Math.sin(t*1.8)),mr=lr+cur.th+(st===3?.025*Math.sin(t*28):0);
+lining.scale.set(lr,5,lr);muscle.scale.set(mr,5,mr);lining.material.color.copy(lc);
+if(st===2&&sel!=='lining'){lining.material.emissive.setHex(0x992222);lining.material.emissiveIntensity=.3+.25*Math.sin(t*4)}
+blobs.forEach(b=>{const d=b.userData,r=Math.max(lr-.17,.1);b.position.set(Math.cos(d.a)*r,Math.sin(d.a)*r,d.z);b.scale.set(cur.mu,cur.mu*(1+.12*Math.sin(t*2+d.ph)),cur.mu);b.visible=cur.mu>.03});
+pol.forEach(p=>{const d=p.userData;d.z+=dt*.5;if(d.z>2.5)d.z=-2.5;const rr=lr*.85*d.r;p.position.set(Math.cos(d.a+t*.3)*rr,Math.sin(d.a+t*.3)*rr,d.z);p.rotation.x=t;p.scale.setScalar(Math.max(cur.tr,.001));p.visible=cur.tr>.03});
+air.forEach(p=>{const d=p.userData;d.z+=dt*(.3+afCur/100*1.8);if(d.z>2.5)d.z=-2.5;const rr=Math.max(lr-.25,.08)*d.r+(st>=3?(Math.random()-.5)*.03:0);p.position.set(Math.cos(d.a)*rr,Math.sin(d.a)*rr,d.z)});
+document.getElementById('mb').style.width=afCur+'%';document.getElementById('mt').textContent=Math.round(afCur)+'%'}
+else{const sT=[0,0,.55,.55,0,0][Math.max(stage,0)];shift+=((stage<0?0:sT)-shift)*.06;
+let osc=0;if(stage===0)osc=.2*(.5+.5*Math.sin(t*3.5));else if(stage===2||stage===3)osc=.04*Math.sin(t*2.5);
+femG.rotation.y=stage===0?Math.sin(t*3.5)*.06:0;
+const pd=t-popT;knee.position.x=pd<.5?Math.sin(t*80)*.05*(1-pd*2):0;
+const T2=updateAcl(t,Math.max(shift+osc,0));
+if(pd<.9){ring.visible=true;ring.position.set(...F.map((v,i)=>v+(T2[i]-v)*.5));ring.scale.setScalar(.5+pd*5);ring.material.opacity=1-pd/.9;ring.quaternion.copy(knee.quaternion).invert().multiply(cam.quaternion)}else ring.visible=false;
+swell.visible=tab==='tear'&&stage===3;if(swell.visible){const e=ease(Math.min(1,(t-entryT)/1.2));swell.scale.setScalar((.5+.5*e)*(1+.04*Math.sin(t*3)))}}
+rend.render(scene,cam);requestAnimationFrame(loop)}
+
+let camY0=.3,foc=null,hov=null,selR=null,camBase=11,camX=0,pmx=0,pmy=0;
+const sp=document.createElement('canvas');sp.width=sp.height=64;const sx=sp.getContext('2d'),gr=sx.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'#fff');gr.addColorStop(1,'rgba(255,255,255,0)');sx.fillStyle=gr;sx.fillRect(0,0,64,64);
+const pa=new Float32Array(1500);for(let i=0;i<500;i++){pa[i*3]=(Math.random()-.5)*34;pa[i*3+1]=(Math.random()-.5)*20;pa[i*3+2]=-12+Math.random()*10}
+const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pa,3));
+const pm=new THREE.PointsMaterial({size:.22,map:new THREE.CanvasTexture(sp),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:0xff7a2a});
+const P=new THREE.Points(pg,pm);scene.add(P);const tcc=new THREE.Color(),dock=document.getElementById('dock'),bar=document.getElementById('bar');
+addEventListener('pointermove',e=>{pmx=e.clientX/innerWidth-.5;pmy=e.clientY/innerHeight-.5});
+cv.addEventListener('pointercancel',()=>{down=null});
+function camStep(t){const sy=scrollY,z=tab==='tear'&&stage>=2&&stage<=3?1.8:tab==='parts'&&sel?1:0,bd=tab==='body';
+cam.position.z+=((bd?(foc?foc.z:camBase+3.5):camBase-z)-cam.position.z)*.06;cam.position.y+=((bd?(foc?foc.y:0):camY0)-cam.position.y)*.06;cam.position.x=camX+pmx*.4;bodyStep(t);
+P.rotation.y=sy*.0004+pmx*.15;P.rotation.x=sy*.0003+pmy*.1;P.rotation.z=t*.01;
+const hot=(tab==='tear'&&stage>=2&&stage<=3)||(tab==='asthma'&&stage>=2&&stage<=4);pm.color.lerp(tcc.setHex(hot?0xff6a5a:0xff7a2a),.04);
+const pd=t-popT;pm.size=.22+(pd<.9?(1-pd/.9)*.35:0);
+bar.style.width=sy/Math.max(1,document.body.scrollHeight-innerHeight)*100+'%'}
+function mkPanels(id,tb,arr){arr.forEach((a,i)=>document.getElementById(id).insertAdjacentHTML('beforeend','<section class="panel" data-tab="'+tb+'" data-stage="'+i+'"><div class="card"><small>STEP '+(i+1)+' OF '+arr.length+'</small><h2>'+a[0].split(': ')[1]+'</h2><p>'+a[1]+'</p></div></section>'))}
+mkPanels('tearP','tear',D.tear);mkPanels('astP','asthma',D.asthma);
+const nav={body:'hero',parts:'s-parts',tear:'s-tear',asthma:'s-ast'};
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>document.getElementById(nav[b.dataset.t]).scrollIntoView());
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;const d=e.target.dataset,none=d.tab==='none';
+view.style.opacity=none?.12:1;dock.style.display=none?'none':'flex';if(none)return;
+if(tab!==d.tab)setTab(d.tab);if(d.stage!==undefined&&stage!==+d.stage){setStage(+d.stage);pickItem(+d.stage)}}),{rootMargin:'-45% 0px -45% 0px'});
+document.querySelectorAll('.panel').forEach(p=>io.observe(p));
+const io2=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.15});
+document.querySelectorAll('.card').forEach(c=>io2.observe(c));
+const Q=[['Which ligament stops the shin bone from sliding too far forward?',['ACL','PCL','Meniscus'],0],['What do people often feel or hear when the ACL tears?',['A whistle','A pop','Nothing'],1],['What shape is the meniscus?',['C-shaped','Square','A round ball'],0],['What does the muscle around the airway do in an asthma attack?',['It relaxes','It tightens','It disappears'],1],['Which medicine quickly relaxes airway muscles?',['Reliever inhaler','Antibiotic','Vitamin C'],0]];
+let qi=0,qs=0;const qz=document.getElementById('qz');
+function qr(){if(qi>=Q.length){qz.innerHTML='<p><b>Score: '+qs+' / '+Q.length+'</b></p><button class="on" id="qa">Try again</button>';document.getElementById('qa').onclick=()=>{qi=0;qs=0;qr()};return}
+const q=Q[qi];qz.innerHTML='<p>'+(qi+1)+'. '+q[0]+'</p><div class="items" style="justify-content:flex-start">'+q[1].map((o,i)=>'<button data-i="'+i+'">'+o+'</button>').join('')+'</div>';
+qz.querySelectorAll('button').forEach(b=>b.onclick=()=>{const ok=+b.dataset.i===q[2];if(ok)qs++;b.style.background=ok?'#2e9e6b':'#c0392b';qz.querySelectorAll('button').forEach(x=>x.onclick=null);setTimeout(()=>{qi++;qr()},900)})}
+qr();
+
+const rp=document.getElementById('rp'),back=document.getElementById('back'),hx=document.getElementById('hx');
+cv.addEventListener('pointermove',e=>{if(tab==='body'&&!down)hov=pick(e)});
+cv.addEventListener('pointerleave',()=>{hov=null});
+function closeRegion(){selR=null;rp.classList.remove('show')}
+function openRegion(k){selR=k;const r=D.reg[k];rp.innerHTML='<button class="x" onclick="closeRegion()">✕</button><small>SELECTED REGION</small><h2>'+r[0]+'</h2><p>'+r[1]+'</p>'+(r[2].length?'<small>TOPICS</small><div class="items" style="justify-content:flex-start">'+r[2].map((t,i)=>'<button class="on" onclick="goTopic(\''+k+'\','+i+')">'+t[0]+'</button>').join('')+'</div>':'<p style="color:var(--muted)">No lesson here yet. Try the knee or the chest!</p>');rp.classList.add('show')}
+function goTopic(k,i){const r=D.reg[k],t=r[2][i];closeRegion();foc={y:r[3],z:6.5};setTimeout(()=>{foc=null;document.getElementById(t[1]).scrollIntoView({behavior:'instant'})},1000)}
+back.onclick=()=>scrollTo({top:0,behavior:'instant'});
+hx.onclick=()=>{if(tab==='tear')setStage(stage===-1?3:-1);else if(tab==='asthma')setStage(stage===0?4:0)};
+function bodyStep(t){const bd=tab==='body';back.style.display=bd?'none':'block';if(!bd)closeRegion();
+const sh=tab==='tear'||tab==='asthma';hx.style.display=sh?'block':'none';
+if(sh){const tx='View: '+((tab==='asthma'?stage===0:stage===-1)?'Healthy':'Affected')+' ⇄';if(hx.textContent!==tx)hx.textContent=tx}
+if(!bd)return;
+Object.keys(bm).forEach(k=>{const on=k===hov,se=k===selR;bm[k].emissive.setHex(on?0xff6a1a:se?0x7a3000:0);bm[k].emissiveIntensity=on?.55+.2*Math.sin(t*6):1;bm[k].opacity+=((on?.6:se?.45:.34)-bm[k].opacity)*.15});
+hots.forEach((h,i)=>{const p=(t*.9+i*.5)%1;h.scale.setScalar(1+p*1.6);h.material.opacity=.9*(1-p)});
+if(foc)bodyG.rotation.y*=.92}
+resize();cam.position.z=camBase+3.5;setTab('body');loop();
+</script>
+</body>
+</html>
